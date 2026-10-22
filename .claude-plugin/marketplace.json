@@ -1,0 +1,16 @@
+{
+  "name": "heydeacon",
+  "description": "Skills for adding Deacon, an AI support agent, to a website or app.",
+  "owner": {
+    "name": "Deacon",
+    "email": "hello@heydeacon.com",
+    "url": "https://heydeacon.com"
+  },
+  "plugins": [
+    {
+      "name": "deacon",
+      "source": "./",
+      "description": "Install the Deacon support widget and send it goals from your app."
+    }
+  ]
+}

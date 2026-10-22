@@ -1,0 +1,13 @@
+{
+  "name": "deacon",
+  "version": "1.0.0",
+  "description": "Install the Deacon support widget and send it goals from your app.",
+  "author": {
+    "name": "Deacon",
+    "email": "hello@heydeacon.com",
+    "url": "https://heydeacon.com"
+  },
+  "homepage": "https://heydeacon.com",
+  "repository": "https://github.com/heydeacon/skills",
+  "license": "MIT"
+}
