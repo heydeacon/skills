@@ -11,6 +11,10 @@ Deacon is an AI support agent. It answers your customers from your own docs and 
 
 Each skill fetches its guide from heydeacon.com when it runs, so it's always current.
 
+## What leaves your machine
+
+Both skills talk to heydeacon.com and nothing else. Each fetches its guide from there. To check its work, `deacon-install` asks heydeacon.com whether a page has loaded the widget, and `deacon-goals` asks which goals arrived, both sending only your public widget key.
+
 ## Install
 
 Claude Code:
