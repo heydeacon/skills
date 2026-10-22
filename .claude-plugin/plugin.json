@@ -9,5 +9,9 @@
   },
   "homepage": "https://heydeacon.com",
   "repository": "https://github.com/heydeacon/skills",
+  "documentationUrl": "https://heydeacon.com/agent/install.md",
+  "supportUrl": "https://github.com/heydeacon/skills/issues",
+  "privacyPolicyUrl": "https://heydeacon.com/privacy",
+  "termsOfServiceUrl": "https://heydeacon.com/terms",
   "license": "MIT"
 }
