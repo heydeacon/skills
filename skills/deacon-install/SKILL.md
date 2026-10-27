@@ -156,7 +156,7 @@ window.deaconContext = ${safe({
 
 **Signed out.** Where the layout knows nobody is signed in, such as the page a sign-out lands on, render `window.deaconUser = null;` instead. When the browser was last used by someone else, that starts the next person fresh: a new visitor, without the previous person's open chat. A page that says nothing about `deaconUser`, such as a marketing page on the same domain, changes nothing, and neither does someone signing in after chatting anonymously.
 
-In the context, send what helps answer a support question — plan, subscription state, role, seat count, trial end, whether onboarding is finished. Send **never a password, a token, an API key or an internal id** there: the context is shown to Deacon's AI, and like `deaconUser` it is emitted into the page's HTML, so the visitor can read every value in it, and so can anyone they share a screenshot with. The user's own id belongs in `deaconUser`, which Deacon keeps from the AI and shows only to the founder. Both arrive from the visitor's browser, so Deacon treats them as a hint rather than proof: `deaconUser` labels this browser's chats and never opens anyone else's.
+In the context, send what helps answer a support question — plan, subscription state, role, seat count, trial end, whether onboarding is finished. Send **never a password, a token, an API key or an internal id** there: the context is shown to Deacon's AI, and like `deaconUser` it is emitted into the page's HTML, so the visitor can read every value in it, and so can anyone they share a screenshot with. The user's own id belongs in `deaconUser`, which Deacon keeps from the AI and shows only to the founder. Both arrive from the visitor's browser, so Deacon treats them as a hint rather than proof: `deaconUser` labels this browser's chats and never opens anyone else's, until the app's server proves it (below).
 
 **An app that learns who is signed in after the page loads**, such as a single-page app on Supabase auth (a Lovable app, say), or one that signs people in and out without a page load, tells Deacon from the code that hears the sign-in state:
 
@@ -184,16 +184,128 @@ window.Deacon?.setContext({ plan: 'Team', state: 'active' });
 If the project is TypeScript, declare both once so the code type-checks. If it already declares `Deacon` for goals, add these to that declaration:
 
 ```ts
+type DeaconUser = {
+    id?: string | number;
+    email?: string;
+    name?: string;
+    token?: (nonce: string) => Promise<string>;
+};
+
 declare global {
     interface Window {
-        deaconUser?: { id?: string | number; email?: string; name?: string } | null;
+        deaconUser?: DeaconUser | null;
         Deacon?: {
-            identify(user: { id?: string | number; email?: string; name?: string } | null): void;
+            identify(user: DeaconUser | null): void;
             setContext(values: Record<string, unknown> | null): void;
         };
     }
 }
 ```
+
+### Prove who is signed in
+
+`window.deaconUser` comes from the visitor's browser, so on its own it is a label. When the app's server signs it as well, Deacon trusts it: the conversation gets a tick, a reply reaches the person's email without them typing it, their chats follow them across their devices on the real site, and the founder can delete everything from one person. Do this as part of step 3 whenever the app has a server and you did step 3. It takes one route and one function on the page.
+
+**The secret.** The founder makes it on the dashboard's Install page, under "Verify who's signed in", and sees it once. It goes on the app's server as the environment variable `DEACON_SECRET`. Read it from there; never write its value into the code, the page or the repository. The key is the whole secret as the Install page shows it, prefix included, used as it is (no decoding). If it isn't set yet, build the route anyway: it answers 204 until it is, and tell the founder to make the secret.
+
+**The route.** `POST /deacon/token` on the app's own server, taking a JSON body `{"nonce": "..."}`. The path is a suggestion, but the `deacon-rails` gem and the `django-deacon` app (1.1.0 and later) mount exactly this one: they sign whoever is logged in with `DEACON_SECRET` and add the sign-out line, so a Rails or Django app needs no route of its own.
+
+- When someone is signed in, answer 200 with a JWT as plain text, signed HS256 with `DEACON_SECRET`, carrying `sub`, `email`, `name`, the `nonce` it was given, and `exp` 10 minutes ahead. Deacon refuses a token that lasts more than 15 minutes, and allows a minute for clocks.
+- When nobody is signed in, or the secret isn't set, answer 204 with no body.
+- Always send `Cache-Control: no-store, private`, and never CORS headers. Otherwise a cache or another site could hand one person's token to someone else.
+- `sub` is the user's id as a string, and it must be unique across the whole app. If ids repeat between workspaces or tenants, prefix them, as in `acme_42`.
+
+In Laravel, with `firebase/php-jwt`, and `'deacon' => ['secret' => env('DEACON_SECRET')]` in `config/services.php`:
+
+```php
+use Firebase\JWT\JWT;
+use Illuminate\Http\Request;
+
+Route::post('/deacon/token', function (Request $request) {
+    $user = $request->user();
+    $secret = config('services.deacon.secret');
+    $private = ['Cache-Control' => 'no-store, private'];
+
+    if ($user === null || ! $secret) {
+        return response('', 204, $private);
+    }
+
+    $token = JWT::encode([
+        'sub' => (string) $user->id,
+        'email' => $user->email,
+        'name' => $user->name,
+        'nonce' => (string) $request->input('nonce'),
+        'iat' => time(),
+        'exp' => time() + 600,
+    ], $secret, 'HS256');
+
+    return response($token, 200, [...$private, 'Content-Type' => 'text/plain']);
+});
+```
+
+In Next.js, as `app/deacon/token/route.ts` with `jose`, from the session helper the app already uses. Auth.js leaves `id` off the session unless the `session` callback adds it, so add it there, or every user would be signed with the same `sub`:
+
+```ts
+// app/deacon/token/route.ts
+import { SignJWT } from 'jose';
+import { auth } from '@/auth'; // the same session helper as the layout
+
+export async function POST(request: Request) {
+  const session = await auth();
+  const secret = process.env.DEACON_SECRET;
+  const headers = { 'Cache-Control': 'no-store, private' };
+
+  if (!session?.user?.id || !secret) {
+    return new Response(null, { status: 204, headers });
+  }
+
+  const { nonce } = await request.json();
+  const token = await new SignJWT({ email: session.user.email, name: session.user.name, nonce })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(String(session.user.id))
+    .setIssuedAt()
+    .setExpirationTime('10m')
+    .sign(new TextEncoder().encode(secret));
+
+  return new Response(token, { status: 200, headers: { ...headers, 'Content-Type': 'text/plain' } });
+}
+```
+
+**The page.** Give `window.deaconUser` a `token` function beside the three fields, and pass the same object to `Deacon.identify()`:
+
+```js
+window.deaconUser = {
+  id: 'u_123',
+  email: 'ana@studio.com',
+  name: 'Ana Ruiz',
+  token: (nonce) => fetch('/deacon/token', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nonce }),
+  }).then((r) => {
+    if (r.status === 204) return '';
+    if (!r.ok) throw new Error('Deacon token route answered ' + r.status);
+    return r.text();
+  }),
+};
+```
+
+Where the layout renders `window.deaconUser` as JSON, as the Laravel, Next.js and Rails examples above do, add the function right after it, in the same script: `if (window.deaconUser) window.deaconUser.token = (nonce) => …`. Add the framework's CSRF header to the `fetch` where the framework checks one on a POST. Laravel does in `routes/web.php`: send `X-XSRF-TOKEN` from the `XSRF-TOKEN` cookie, or `X-CSRF-TOKEN` from the csrf meta tag, as the app's other requests do. Rails wants `X-CSRF-Token` from `csrf_meta_tags`, and Django `X-CSRFToken` from its `csrftoken` cookie. The function throws on any answer but 200 and 204, so a missing route or a refused CSRF check reaches Deacon as `unavailable` rather than looking like nobody is signed in.
+
+The `token` function is the one exception to never passing Deacon a token. Deacon calls it only when the chat opens and shortly before a proof runs out, with a value that ties the token to that one chat session, and keeps nothing it returns. Keep the function out of anything that turns `window.deaconUser` into JSON. On sign-out, always call `window.Deacon?.identify(null)` as above: it ends the proof in every tab of that browser at once.
+
+Use the secret on the real site only. Chats follow a person only between browsers that proved on the same site, so a staging or preview site needs its own Deacon team, with its own secret. A browser that has already proved on one of the founder's sites is refused as `linked` on another subdomain of the same domain, since the two share its visitor cookie.
+
+**Checking it.** Deacon asks for a token only when the chat opens, so load a page while logged in and open the chat. Step 5's `signedIn.verifiedAt` moves when Deacon trusts someone, and `failure` names the last refusal in one word, newer than `verifiedAt` when it is the one to fix:
+
+- `signature`: not signed with this secret. Check `DEACON_SECRET` holds the whole string, prefix included.
+- `expired`: past its `exp`, or the server's clock is more than a minute out.
+- `too_long`: `exp` more than 15 minutes ahead. Sign them for 10.
+- `unreadable`: not an HS256 JWT with `exp` and `sub`, `sub` reads `undefined`, `null` or `[object Object]` because the user's id wasn't there when it was signed, or `sub` isn't one line of text. An `email` that isn't an address Deacon can send to, such as `test@localhost`, is left off and the token still verifies.
+- `nonce`: the token didn't carry the nonce the page was given. Sign the `nonce` from the request body.
+- `unavailable`: the page named someone, but the `token` function threw or took over 5 seconds, as it does when the route is missing, refuses the CSRF check or fails.
+- `linked`: that browser already belongs to someone else, usually because sign-out doesn't call `Deacon.identify(null)`, or it proved on another of the founder's sites.
 
 ## 4. Open it from your own button
 
@@ -227,7 +339,8 @@ Afterwards:
 {"seen": {"origin": "https://acme.com", "lastSeenAt": "2026-09-06T14:02:10+00:00", "local": false, "fresh": true},
  "latest": {"origin": "http://localhost:3000", "lastSeenAt": "2026-09-08T09:14:22+00:00", "local": true},
  "refused": null,
- "signedIn": {"origin": "http://localhost:3000", "lastSeenAt": "2026-09-08T09:14:22+00:00", "local": true}}
+ "signedIn": {"origin": "http://localhost:3000", "lastSeenAt": "2026-09-08T09:14:22+00:00", "local": true,
+              "verifiedAt": "2026-09-08T09:15:03+00:00", "failedAt": null, "failure": null}}
 ```
 
 Two answers about sightings, because there are two questions. `seen` is the one the founder's Install page asks — are you live — so it prefers a real deployment and keeps reporting it once one has been heard from. `latest` is the one you are asking: the newest sighting whatever its origin, which is the only one that moves when you install into a dev environment on a site that is already live.
@@ -235,6 +348,8 @@ Two answers about sightings, because there are two questions. `seen` is the one 
 `local` is true for a development address (localhost, 127.0.0.1, a `.test` or `.local` site, or a private network address), which is a working install rather than a launch. `fresh` is false when nothing has been heard for a day, or when the founder has removed every domain.
 
 `signedIn` answers step 3: where and when a page last loaded Deacon with someone signed in, through `window.deaconUser` or `Deacon.identify()`. It says whether, never who, so no id, email or name is ever in it. Like `latest`, it is the newest sighting whatever its origin, so it moves when you test on your own machine, and `local` says which it was. It stays null until a page has loaded with someone signed in, and moves at most once every ten minutes for each address. A page carrying `data-no-page-views` still counts, since this is not a page view.
+
+If you added the token route, `verifiedAt` is when Deacon last trusted someone signed in, and `failedAt` and `failure` the last refusal, in the words step 3 lists. Watch `verifiedAt` move: a failure is never cleared, only outdated by a newer `verifiedAt`, and anyone holding the key can cause one, so a `failure` older than `verifiedAt` is nothing to fix. Like `lastSeenAt`, each moves at most once every ten minutes for each address, so a retest within ten minutes of the last one may leave them as they were.
 
 **Ask once before you start, and keep the answer.** A site that has been running Deacon already answers straight away with its own sighting, so a non-null first call is evidence of nothing you did. What you are waiting for is `latest` changing.
 
@@ -257,8 +372,9 @@ You almost certainly have no browser, and a sighting cannot be faked, so the usu
 3. Ask the founder to open one of its pages in their browser, signed in if you did step 3, and wait.
 4. Poll every few seconds until `latest` stops being null, or `latest.lastSeenAt` moves past the one you noted. Give it a couple of minutes before concluding something is wrong.
 5. If you did step 3, keep polling the same way until `signedIn` stops being null, or `signedIn.lastSeenAt` moves past the one you noted.
+6. If you added the token route and `DEACON_SECRET` is set, ask the founder to load a page while logged in and open the chat, then keep polling until `signedIn.verifiedAt` moves past the one you noted. If `failure` names a word newer than it, fix what step 3 says and try again.
 
-If you do have a headless browser, load a page of the running app yourself and skip the asking. For `signedIn` that page has to be one someone is signed in on.
+If you do have a headless browser, load a page of the running app yourself and skip the asking. For `signedIn` that page has to be one someone is signed in on, and for `verifiedAt` load a page while logged in and open the chat, with `Deacon.open()`.
 
 **Never request the config endpoint by hand to make a sighting appear.** A sighting is the evidence that the tag is on a page that really loads; a request you make yourself proves only that you can make requests.
 
@@ -273,6 +389,7 @@ End with a short report, and be specific:
 - Whether you added a button of your own, and where it is.
 - Where the widget was seen — the origin under `latest`, which is the page you caused to load. If `latest.local` was true, say so plainly: **seen on localhost — add your real domain on the Install page when you deploy**, and name the domain to add.
 - Whether a signed-in visitor was seen: the origin under `signedIn`, and whether it was local. If it is still null, say why: nobody has loaded a page signed in since the change, or the app has no accounts and you skipped step 3.
+- Whether a visitor was verified: where you put the token route and the `token` function, whether `signedIn.verifiedAt` moved, and the `failure` word if one is newer. If `DEACON_SECRET` isn't set yet, say they make it on the Install page and set it on the server, and that the route answers 204 until then.
 - If the address you tested on isn't covered by their list, say which address they need to add, and that only they can add it, on the Install page.
 
 Then point them at the next step: counting sign ups, paywall hits and upgrades on their dashboard, which the deacon-goals skill sets up.
