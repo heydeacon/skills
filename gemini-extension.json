@@ -1,0 +1,10 @@
+{
+  "name": "deacon",
+  "version": "1.4.0",
+  "description": "Add Deacon's support chat to your site, count sign ups and upgrades, and let your coding agent read what customers report.",
+  "mcpServers": {
+    "deacon": {
+      "httpUrl": "https://heydeacon.com/mcp"
+    }
+  }
+}

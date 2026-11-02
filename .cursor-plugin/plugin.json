@@ -1,0 +1,22 @@
+{
+  "name": "deacon",
+  "displayName": "Deacon",
+  "version": "1.4.0",
+  "description": "Add Deacon's support chat to your site, count sign ups and upgrades, and let your coding agent read what customers report.",
+  "author": {
+    "name": "Deacon",
+    "email": "hello@heydeacon.com"
+  },
+  "homepage": "https://heydeacon.com/features/mcp-server",
+  "repository": "https://github.com/heydeacon/skills",
+  "license": "MIT",
+  "logo": ".claude-plugin/icon.png",
+  "keywords": [
+    "deacon",
+    "customer-support",
+    "mcp",
+    "bug-reports",
+    "support-chat"
+  ],
+  "mcpServers": "./.mcp.json"
+}

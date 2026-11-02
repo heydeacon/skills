@@ -1,7 +1,8 @@
 {
   "name": "deacon",
-  "version": "1.3.1",
-  "description": "Install the Deacon support widget and send it goals from your app.",
+  "displayName": "Deacon",
+  "version": "1.4.0",
+  "description": "Add Deacon's support chat to your site, count sign ups and upgrades, and let your coding agent read what customers report.",
   "author": {
     "name": "Deacon",
     "email": "hello@heydeacon.com",
@@ -13,5 +14,13 @@
   "supportUrl": "https://github.com/heydeacon/skills/issues",
   "privacyPolicyUrl": "https://heydeacon.com/privacy",
   "termsOfServiceUrl": "https://heydeacon.com/terms",
-  "license": "MIT"
+  "icon": "./.claude-plugin/icon.png",
+  "license": "MIT",
+  "keywords": [
+    "deacon",
+    "customer-support",
+    "mcp",
+    "bug-reports",
+    "support-chat"
+  ]
 }

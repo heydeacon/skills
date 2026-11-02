@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "deacon": {
+      "type": "http",
+      "url": "https://heydeacon.com/mcp"
+    }
+  }
+}
