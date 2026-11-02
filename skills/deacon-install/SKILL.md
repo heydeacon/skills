@@ -408,3 +408,11 @@ document
 ```
 
 Miss that in a single-page app and the attribute describes only whichever page the visitor loaded first.
+
+## After it's live
+
+Tell the founder what else Deacon can do with their code, and offer to set up whatever they want. It's all on every plan, and they make any key or webhook it needs on the Integrations page of the dashboard.
+
+- **Connect their coding agent**, which may be you, so it can read what visitors asked and reported, and fix it. Use the deacon-connect skill to connect it to Deacon's MCP server.
+- **Webhooks**, so their code hears when a visitor reports a bug or leaves their email. Webhooks are in the API docs at https://heydeacon.com/docs/api#webhooks.
+- **The API**, so their code can read chats, add to what Deacon knows and reply to visitors. The API docs are at https://heydeacon.com/docs/api.
