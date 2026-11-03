@@ -40,8 +40,8 @@ In an app with a layout, the tag goes in the layout so it runs once for every pa
 
 On an app built with one of the AI builders, the tag goes in the same place, and two of them document the route themselves:
 
-- Lovable: paste the snippet into the project chat and ask Lovable to place it, which is what its own guide on embedding third-party widgets says to do. The code editor is read-only on the free plan, so on a free project the chat or the Git sync is the way in.
-- Bolt: open Code view and paste it before `</body>`, or paste it into the chatbox and ask Bolt to add it. Its hosting documentation names both routes for third-party scripts, and leaves the location to the script's author. Check the published site rather than the preview. The preview runs at an address of its own, inside the browser on Chrome and hosted by Bolt on Safari, and the widget stays hidden on any address that is not in the allowed domains.
+- Lovable: the founder pastes Install's prompt for Lovable into the project chat and Lovable places the tag, which is what its own guide on embedding third-party widgets says to do. That prompt gives the key as `deacon_pk_…`, which is the same key. Lovable's chat takes a bare `pk_…` key for another service's and swaps it for a saved secret, so the bare snippet never goes into that chat. The code editor is read-only on the free plan, so on a free project the chat or the Git sync is the way in.
+- Bolt: open Code view and paste it before `</body>`, or have the founder paste Install's prompt for Bolt into the chatbox. Its hosting documentation names both routes for third-party scripts, and leaves the location to the script's author. Check the published site rather than the preview. The preview runs at an address of its own, inside the browser on Chrome and hosted by Bolt on Safari, and the widget stays hidden on any address that is not in the allowed domains.
 - v0: the root layout, `app/layout.tsx`, or `src/app/layout.tsx` in a project that keeps its code in a `src` folder. A plain script tag in the body, or `next/script` with the `afterInteractive` strategy. v0 does not document third-party scripts, so this is our instruction rather than theirs.
 - Replit: the HTML file the deployment serves, or the layout if the app has one. Replit does not document third-party scripts either. If the project followed Replit's security checklist it may carry a `default-src 'self'` content security policy. That blocks the loader outright, and widening it takes four directives rather than one. `script-src`, `connect-src` and `frame-src` each need Deacon's origin, `https://heydeacon.com`, beside `'self'`: the first for the loader, the second for the settings request and the page, goal and error beacons, the third for the chat frame. `style-src` needs `'unsafe-inline'` beside `'self'`, for the style sheet the loader writes into its shadow root; a nonce cannot reach that sheet, and a hash would break with the next loader release. The replies stream inside the frame, under Deacon's own policy, so they need nothing here.
 
@@ -411,7 +411,7 @@ Miss that in a single-page app and the attribute describes only whichever page t
 
 ## After it's live
 
-Tell the founder what else Deacon can do with their code, and offer to set up whatever they want. It's all on every plan, and they make any key or webhook it needs on the Integrations page of the dashboard.
+Tell the founder what their code and their coding agent can do with Deacon, and offer to set up whatever they want. It's all on every plan, and they make any key or webhook it needs on the Integrations page of the dashboard.
 
 - **Connect their coding agent**, which may be you, so it can read what visitors asked and reported, and fix it. Use the deacon-connect skill to connect it to Deacon's MCP server.
 - **Webhooks**, so their code hears when a visitor reports a bug or leaves their email. Webhooks are in the API docs at https://heydeacon.com/docs/api#webhooks.
